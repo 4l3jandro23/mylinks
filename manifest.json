@@ -1,0 +1,11 @@
+{
+  "name": "mylinks",
+  "short_name": "mylinks",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#14161a",
+  "theme_color": "#4f46e5",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

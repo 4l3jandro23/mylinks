@@ -1,10 +1,26 @@
+import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js";
+
 const STORAGE_KEY = "mylinks.items";
 
+const SEED_LINKS = [
+  {
+    id: "seed-aoty",
+    title: "Album of the Year",
+    url: "https://www.albumoftheyear.org/",
+    tags: ["música"],
+    color: "#db2777",
+    createdAt: Date.now(),
+  },
+];
+
 const state = {
-  links: loadLinks(),
+  links: [],
   search: "",
   tag: "",
+  user: null,
 };
+
+let cloud = null; // set up if Firebase is configured
 
 const grid = document.getElementById("linksGrid");
 const emptyState = document.getElementById("emptyState");
@@ -19,21 +35,37 @@ const linkIdInput = document.getElementById("linkId");
 const linkTitleInput = document.getElementById("linkTitle");
 const linkUrlInput = document.getElementById("linkUrl");
 const linkTagsInput = document.getElementById("linkTags");
+const linkColorInput = document.getElementById("linkColor");
+const colorPicker = document.getElementById("linkColorPicker");
 const exportBtn = document.getElementById("exportBtn");
 const importInput = document.getElementById("importInput");
 const themeToggle = document.getElementById("themeToggle");
+const authBtn = document.getElementById("authBtn");
+const userAvatar = document.getElementById("userAvatar");
+const syncStatus = document.getElementById("syncStatus");
+const localModeBanner = document.getElementById("localModeBanner");
 
-function loadLinks() {
+function loadLocalLinks() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (raw) return JSON.parse(raw);
+    return [...SEED_LINKS];
   } catch {
-    return [];
+    return [...SEED_LINKS];
   }
 }
 
-function saveLinks() {
+function saveLocalLinks() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.links));
+}
+
+function faviconUrl(url) {
+  try {
+    const domain = new URL(url).hostname;
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+  } catch {
+    return "";
+  }
 }
 
 function parseTags(raw) {
@@ -45,7 +77,7 @@ function parseTags(raw) {
 
 function allTags() {
   const set = new Set();
-  state.links.forEach((l) => l.tags.forEach((t) => set.add(t)));
+  state.links.forEach((l) => (l.tags || []).forEach((t) => set.add(t)));
   return [...set].sort();
 }
 
@@ -68,7 +100,7 @@ function filteredLinks() {
       !q ||
       l.title.toLowerCase().includes(q) ||
       l.url.toLowerCase().includes(q);
-    const matchesTag = !state.tag || l.tags.includes(state.tag);
+    const matchesTag = !state.tag || (l.tags || []).includes(state.tag);
     return matchesQuery && matchesTag;
   });
 }
@@ -82,6 +114,19 @@ function render() {
   items.forEach((link) => {
     const card = document.createElement("article");
     card.className = "link-card";
+    card.style.setProperty("--card-color", link.color || "#4f46e5");
+
+    const head = document.createElement("div");
+    head.className = "card-head";
+
+    const favicon = document.createElement("img");
+    favicon.className = "favicon";
+    favicon.src = faviconUrl(link.url);
+    favicon.alt = "";
+    favicon.loading = "lazy";
+
+    const headText = document.createElement("div");
+    headText.className = "card-head-text";
 
     const a = document.createElement("a");
     a.className = "link-title";
@@ -94,12 +139,20 @@ function render() {
     url.className = "link-url";
     url.textContent = link.url;
 
+    headText.append(a, url);
+    head.append(favicon, headText);
+
     const tagList = document.createElement("div");
     tagList.className = "tag-list";
-    link.tags.forEach((t) => {
+    (link.tags || []).forEach((t) => {
       const chip = document.createElement("span");
       chip.className = "tag-chip";
       chip.textContent = t;
+      chip.addEventListener("click", () => {
+        state.tag = t;
+        tagFilter.value = t;
+        render();
+      });
       tagList.appendChild(chip);
     });
 
@@ -116,19 +169,21 @@ function render() {
     deleteBtn.addEventListener("click", () => deleteLink(link.id));
 
     actions.append(editBtn, deleteBtn);
-    card.append(a, url, tagList, actions);
+    card.append(head, tagList, actions);
     grid.appendChild(card);
   });
 }
 
 function openDialog(link) {
   linkForm.reset();
+  setSelectedColor("#4f46e5");
   if (link) {
     dialogTitle.textContent = "Editar enlace";
     linkIdInput.value = link.id;
     linkTitleInput.value = link.title;
     linkUrlInput.value = link.url;
-    linkTagsInput.value = link.tags.join(", ");
+    linkTagsInput.value = (link.tags || []).join(", ");
+    setSelectedColor(link.color || "#4f46e5");
   } else {
     dialogTitle.textContent = "Añadir enlace";
     linkIdInput.value = "";
@@ -136,31 +191,55 @@ function openDialog(link) {
   dialog.showModal();
 }
 
-function deleteLink(id) {
+function setSelectedColor(color) {
+  linkColorInput.value = color;
+  [...colorPicker.querySelectorAll(".color-swatch")].forEach((sw) => {
+    sw.classList.toggle("selected", sw.dataset.color === color);
+  });
+}
+
+colorPicker.addEventListener("click", (e) => {
+  const btn = e.target.closest(".color-swatch");
+  if (!btn) return;
+  setSelectedColor(btn.dataset.color);
+});
+
+async function deleteLink(id) {
+  if (cloud) {
+    await cloud.deleteLink(id);
+    return;
+  }
   state.links = state.links.filter((l) => l.id !== id);
-  saveLinks();
+  saveLocalLinks();
   render();
 }
 
-linkForm.addEventListener("submit", (e) => {
+linkForm.addEventListener("submit", async () => {
   const id = linkIdInput.value;
   const title = linkTitleInput.value.trim();
   const url = linkUrlInput.value.trim();
   const tags = parseTags(linkTagsInput.value);
+  const color = linkColorInput.value;
+
+  if (cloud) {
+    await cloud.saveLink({ id: id || undefined, title, url, tags, color });
+    return;
+  }
 
   if (id) {
     const link = state.links.find((l) => l.id === id);
-    Object.assign(link, { title, url, tags });
+    Object.assign(link, { title, url, tags, color });
   } else {
     state.links.unshift({
       id: crypto.randomUUID(),
       title,
       url,
       tags,
+      color,
       createdAt: Date.now(),
     });
   }
-  saveLinks();
+  saveLocalLinks();
   render();
 });
 
@@ -200,11 +279,16 @@ importInput.addEventListener("change", async (e) => {
       title: String(item.title || "Sin título"),
       url: String(item.url || "#"),
       tags: Array.isArray(item.tags) ? item.tags : [],
+      color: item.color || "#4f46e5",
       createdAt: item.createdAt || Date.now(),
     }));
-    state.links = normalized;
-    saveLinks();
-    render();
+    if (cloud) {
+      await cloud.importLinks(normalized);
+    } else {
+      state.links = normalized;
+      saveLocalLinks();
+      render();
+    }
   } catch (err) {
     alert("No se pudo importar el archivo: " + err.message);
   } finally {
@@ -229,4 +313,135 @@ themeToggle.addEventListener("click", () => {
   applyTheme(saved || (prefersDark ? "dark" : "light"));
 })();
 
-render();
+async function initCloudSync() {
+  const { initializeApp } = await import(
+    "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js"
+  );
+  const {
+    getAuth,
+    GoogleAuthProvider,
+    signInWithPopup,
+    signOut,
+    onAuthStateChanged,
+  } = await import(
+    "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js"
+  );
+  const {
+    getFirestore,
+    collection,
+    doc,
+    setDoc,
+    deleteDoc,
+    onSnapshot,
+    writeBatch,
+  } = await import(
+    "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js"
+  );
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const provider = new GoogleAuthProvider();
+  let unsubscribeLinks = null;
+
+  authBtn.hidden = false;
+  authBtn.textContent = "Iniciar sesión con Google";
+  authBtn.addEventListener("click", () => {
+    if (state.user) {
+      signOut(auth);
+    } else {
+      signInWithPopup(auth, provider).catch((err) => {
+        alert("No se pudo iniciar sesión: " + err.message);
+      });
+    }
+  });
+  userAvatar.addEventListener("click", () => signOut(auth));
+
+  function linksCol(uid) {
+    return collection(db, "users", uid, "links");
+  }
+
+  cloud = {
+    async saveLink({ id, title, url, tags, color }) {
+      const uid = state.user.uid;
+      const ref = id ? doc(linksCol(uid), id) : doc(linksCol(uid));
+      await setDoc(ref, {
+        title,
+        url,
+        tags,
+        color,
+        createdAt: Date.now(),
+      });
+    },
+    async deleteLink(id) {
+      await deleteDoc(doc(linksCol(state.user.uid), id));
+    },
+    async importLinks(items) {
+      const uid = state.user.uid;
+      const batch = writeBatch(db);
+      items.forEach((item) => {
+        const ref = doc(linksCol(uid), item.id);
+        batch.set(ref, {
+          title: item.title,
+          url: item.url,
+          tags: item.tags,
+          color: item.color,
+          createdAt: item.createdAt,
+        });
+      });
+      await batch.commit();
+    },
+  };
+
+  onAuthStateChanged(auth, async (user) => {
+    state.user = user;
+    if (unsubscribeLinks) {
+      unsubscribeLinks();
+      unsubscribeLinks = null;
+    }
+
+    if (user) {
+      authBtn.hidden = true;
+      userAvatar.hidden = false;
+      userAvatar.src = user.photoURL || "";
+      userAvatar.title = `${user.displayName || user.email} · clic para cerrar sesión`;
+      syncStatus.hidden = false;
+      syncStatus.textContent = "☁ Sincronizado";
+      localModeBanner.hidden = true;
+
+      unsubscribeLinks = onSnapshot(linksCol(user.uid), async (snap) => {
+        if (snap.empty && !snap.metadata.hasPendingWrites) {
+          await cloud.importLinks(SEED_LINKS);
+          return;
+        }
+        state.links = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        render();
+      });
+    } else {
+      authBtn.hidden = false;
+      userAvatar.hidden = true;
+      syncStatus.hidden = false;
+      syncStatus.textContent = "Sin sincronizar";
+      localModeBanner.hidden = true;
+      state.links = loadLocalLinks();
+      render();
+    }
+  });
+}
+
+if (isFirebaseConfigured) {
+  state.links = [];
+  render();
+  initCloudSync().catch((err) => {
+    console.error("Firebase init failed", err);
+    localModeBanner.hidden = false;
+    state.links = loadLocalLinks();
+    render();
+  });
+} else {
+  localModeBanner.hidden = false;
+  state.links = loadLocalLinks();
+  render();
+}

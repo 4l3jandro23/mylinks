@@ -2,37 +2,67 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>mylinks</title>
+<meta name="description" content="Tu gestor de enlaces personal">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="mylinks">
+<meta name="theme-color" content="#4f46e5">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="topbar">
-    <h1>mylinks</h1>
-    <button id="themeToggle" class="icon-btn" title="Cambiar tema" aria-label="Cambiar tema">🌙</button>
+    <div class="brand">
+      <img src="icon.svg" alt="" class="brand-icon">
+      <h1>mylinks</h1>
+    </div>
+    <div class="topbar-actions">
+      <span id="syncStatus" class="sync-status" hidden></span>
+      <button id="authBtn" class="icon-btn" hidden>Iniciar sesión</button>
+      <img id="userAvatar" class="user-avatar" hidden alt="">
+      <button id="themeToggle" class="icon-btn" title="Cambiar tema" aria-label="Cambiar tema">🌙</button>
+    </div>
   </header>
+
+  <div id="localModeBanner" class="local-banner" hidden>
+    Modo local: tus enlaces se guardan solo en este navegador. Configura Firebase para sincronizar con tu iPhone.
+  </div>
 
   <main class="container">
     <section class="controls">
-      <input id="searchInput" type="text" placeholder="Buscar por título o URL..." autocomplete="off">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="searchInput" type="text" placeholder="Buscar por título o URL..." autocomplete="off">
+      </div>
       <select id="tagFilter">
         <option value="">Todas las etiquetas</option>
       </select>
-      <button id="addBtn" class="primary-btn">+ Añadir enlace</button>
     </section>
 
     <section id="linksGrid" class="links-grid"></section>
 
-    <p id="emptyState" class="empty-state" hidden>No hay enlaces todavía. Añade el primero.</p>
+    <div id="emptyState" class="empty-state" hidden>
+      <div class="empty-icon">🔗</div>
+      <p>No hay enlaces todavía. Añade el primero.</p>
+    </div>
 
     <section class="io-actions">
-      <button id="exportBtn">Exportar JSON</button>
+      <button id="exportBtn">⬇ Exportar JSON</button>
       <label class="import-label">
-        Importar JSON
+        ⬆ Importar JSON
         <input type="file" id="importInput" accept="application/json" hidden>
       </label>
     </section>
   </main>
+
+  <button id="addBtn" class="fab" title="Añadir enlace" aria-label="Añadir enlace">+</button>
 
   <dialog id="linkDialog">
     <form id="linkForm" method="dialog">
@@ -48,6 +78,17 @@
       <label for="linkTags">Etiquetas (separadas por coma)</label>
       <input type="text" id="linkTags" placeholder="trabajo, lectura, herramientas">
 
+      <label for="linkColor">Color de acento</label>
+      <div class="color-picker" id="linkColorPicker">
+        <button type="button" class="color-swatch" data-color="#4f46e5" style="--sw:#4f46e5"></button>
+        <button type="button" class="color-swatch" data-color="#dc2626" style="--sw:#dc2626"></button>
+        <button type="button" class="color-swatch" data-color="#16a34a" style="--sw:#16a34a"></button>
+        <button type="button" class="color-swatch" data-color="#d97706" style="--sw:#d97706"></button>
+        <button type="button" class="color-swatch" data-color="#0891b2" style="--sw:#0891b2"></button>
+        <button type="button" class="color-swatch" data-color="#db2777" style="--sw:#db2777"></button>
+        <input type="hidden" id="linkColor" value="#4f46e5">
+      </div>
+
       <div class="dialog-actions">
         <button type="button" id="cancelBtn">Cancelar</button>
         <button type="submit" id="saveBtn" class="primary-btn">Guardar</button>
@@ -55,6 +96,6 @@
     </form>
   </dialog>
 
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
