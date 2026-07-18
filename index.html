@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mylinks</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>mylinks</h1>
+    <button id="themeToggle" class="icon-btn" title="Cambiar tema" aria-label="Cambiar tema">🌙</button>
+  </header>
+
+  <main class="container">
+    <section class="controls">
+      <input id="searchInput" type="text" placeholder="Buscar por título o URL..." autocomplete="off">
+      <select id="tagFilter">
+        <option value="">Todas las etiquetas</option>
+      </select>
+      <button id="addBtn" class="primary-btn">+ Añadir enlace</button>
+    </section>
+
+    <section id="linksGrid" class="links-grid"></section>
+
+    <p id="emptyState" class="empty-state" hidden>No hay enlaces todavía. Añade el primero.</p>
+
+    <section class="io-actions">
+      <button id="exportBtn">Exportar JSON</button>
+      <label class="import-label">
+        Importar JSON
+        <input type="file" id="importInput" accept="application/json" hidden>
+      </label>
+    </section>
+  </main>
+
+  <dialog id="linkDialog">
+    <form id="linkForm" method="dialog">
+      <h2 id="dialogTitle">Añadir enlace</h2>
+      <input type="hidden" id="linkId">
+
+      <label for="linkTitle">Título</label>
+      <input type="text" id="linkTitle" required>
+
+      <label for="linkUrl">URL</label>
+      <input type="url" id="linkUrl" required placeholder="https://ejemplo.com">
+
+      <label for="linkTags">Etiquetas (separadas por coma)</label>
+      <input type="text" id="linkTags" placeholder="trabajo, lectura, herramientas">
+
+      <div class="dialog-actions">
+        <button type="button" id="cancelBtn">Cancelar</button>
+        <button type="submit" id="saveBtn" class="primary-btn">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
